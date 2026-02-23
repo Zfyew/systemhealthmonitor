@@ -1,12 +1,15 @@
 # System Health Monitor
-# v5: live dashboard view, refreshes every 2 seconds
+# v6: alerts when CPU or memory goes above set thresholds
 
 import psutil
 import os
 import time
 
+# anything above these levels triggers a warning
+CPU_THRESHOLD = 80
+MEM_THRESHOLD = 85
+
 def clear():
-    # clear screen so it looks like a live dashboard
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def get_bar(percent, width=20):
@@ -15,13 +18,17 @@ def get_bar(percent, width=20):
 
 def monitor_cpu():
     cpu = psutil.cpu_percent(interval=1)
-    print(f"  CPU      [{get_bar(cpu)}] {cpu}%")
+    alert = " ⚠ HIGH" if cpu >= CPU_THRESHOLD else ""
+    print(f"  CPU      [{get_bar(cpu)}] {cpu}%{alert}")
+    return cpu
 
 def monitor_memory():
     mem = psutil.virtual_memory()
     used = mem.used / (1024 ** 3)
     total = mem.total / (1024 ** 3)
-    print(f"  RAM      [{get_bar(mem.percent)}] {mem.percent}%  {used:.1f} GB / {total:.1f} GB")
+    alert = " ⚠ HIGH" if mem.percent >= MEM_THRESHOLD else ""
+    print(f"  RAM      [{get_bar(mem.percent)}] {mem.percent}%  {used:.1f} GB / {total:.1f} GB{alert}")
+    return mem.percent
 
 def monitor_disk():
     for partition in psutil.disk_partitions():
@@ -47,6 +54,15 @@ def list_processes():
     for p in procs:
         print(f"  {p['pid']:<8} {p['name'][:26]:<28} {p['memory_percent']:>5.1f}% {p['cpu_percent']:>5.1f}%")
 
+def show_alerts(cpu, mem):
+    alerts = []
+    if cpu >= CPU_THRESHOLD:
+        alerts.append(f"  ⚠ CPU above {CPU_THRESHOLD}% — currently at {cpu}%")
+    if mem >= MEM_THRESHOLD:
+        alerts.append(f"  ⚠ Memory above {MEM_THRESHOLD}% — currently at {mem}%")
+    if alerts:
+        print("\n" + "\n".join(alerts))
+
 print("Press Ctrl+C to exit\n")
 time.sleep(1)
 
@@ -56,10 +72,11 @@ try:
         print("=" * 56)
         print("          SYSTEM HEALTH MONITOR")
         print("=" * 56)
-        monitor_cpu()
-        monitor_memory()
+        cpu = monitor_cpu()
+        mem = monitor_memory()
         monitor_disk()
         list_processes()
+        show_alerts(cpu, mem)
         print(f"\n  Refreshing every 2 seconds. Ctrl+C to exit.")
         print("=" * 56)
         time.sleep(2)
