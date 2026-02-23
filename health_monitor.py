@@ -1,13 +1,16 @@
 # System Health Monitor
-# v6: alerts when CPU or memory goes above set thresholds
+# v7: clean summary report on exit
 
 import psutil
 import os
 import time
 
-# anything above these levels triggers a warning
 CPU_THRESHOLD = 80
 MEM_THRESHOLD = 85
+
+# tracks peak values during the session
+peak_cpu = 0
+peak_mem = 0
 
 def clear():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -17,15 +20,21 @@ def get_bar(percent, width=20):
     return "█" * filled + "░" * (width - filled)
 
 def monitor_cpu():
+    global peak_cpu
     cpu = psutil.cpu_percent(interval=1)
+    if cpu > peak_cpu:
+        peak_cpu = cpu
     alert = " ⚠ HIGH" if cpu >= CPU_THRESHOLD else ""
     print(f"  CPU      [{get_bar(cpu)}] {cpu}%{alert}")
     return cpu
 
 def monitor_memory():
+    global peak_mem
     mem = psutil.virtual_memory()
     used = mem.used / (1024 ** 3)
     total = mem.total / (1024 ** 3)
+    if mem.percent > peak_mem:
+        peak_mem = mem.percent
     alert = " ⚠ HIGH" if mem.percent >= MEM_THRESHOLD else ""
     print(f"  RAM      [{get_bar(mem.percent)}] {mem.percent}%  {used:.1f} GB / {total:.1f} GB{alert}")
     return mem.percent
@@ -63,6 +72,19 @@ def show_alerts(cpu, mem):
     if alerts:
         print("\n" + "\n".join(alerts))
 
+def print_summary():
+    print("\n" + "=" * 56)
+    print("          SESSION SUMMARY")
+    print("=" * 56)
+    print(f"  Peak CPU usage:    {peak_cpu}%")
+    print(f"  Peak memory usage: {peak_mem}%")
+    if peak_cpu >= CPU_THRESHOLD:
+        print(f"  ⚠ CPU hit the {CPU_THRESHOLD}% threshold during this session")
+    if peak_mem >= MEM_THRESHOLD:
+        print(f"  ⚠ Memory hit the {MEM_THRESHOLD}% threshold during this session")
+    print("=" * 56)
+    print()
+
 print("Press Ctrl+C to exit\n")
 time.sleep(1)
 
@@ -81,4 +103,4 @@ try:
         print("=" * 56)
         time.sleep(2)
 except KeyboardInterrupt:
-    print("\n\nMonitor stopped.\n")
+    print_summary()
