@@ -1,65 +1,67 @@
 # System Health Monitor
-# v4: added running process list
+# v5: live dashboard view, refreshes every 2 seconds
 
 import psutil
+import os
+import time
+
+def clear():
+    # clear screen so it looks like a live dashboard
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def get_bar(percent, width=20):
+    filled = int(percent / 100 * width)
+    return "█" * filled + "░" * (width - filled)
 
 def monitor_cpu():
-    print("\n[*] CPU Usage (10 seconds)...\n")
-    for i in range(10):
-        cpu = psutil.cpu_percent(interval=1)
-        bar = "█" * int(cpu / 5) + "░" * (20 - int(cpu / 5))
-        print(f"    CPU: [{bar}] {cpu}%")
+    cpu = psutil.cpu_percent(interval=1)
+    print(f"  CPU      [{get_bar(cpu)}] {cpu}%")
 
 def monitor_memory():
-    print("\n[*] Memory Usage...\n")
     mem = psutil.virtual_memory()
     used = mem.used / (1024 ** 3)
     total = mem.total / (1024 ** 3)
-    percent = mem.percent
-    bar = "█" * int(percent / 5) + "░" * (20 - int(percent / 5))
-    print(f"    RAM: [{bar}] {percent}%")
-    print(f"    Used: {used:.2f} GB / {total:.2f} GB")
+    print(f"  RAM      [{get_bar(mem.percent)}] {mem.percent}%  {used:.1f} GB / {total:.1f} GB")
 
 def monitor_disk():
-    print("\n[*] Disk Usage...\n")
     for partition in psutil.disk_partitions():
         try:
             usage = psutil.disk_usage(partition.mountpoint)
             used = usage.used / (1024 ** 3)
             total = usage.total / (1024 ** 3)
-            percent = usage.percent
-            bar = "█" * int(percent / 5) + "░" * (20 - int(percent / 5))
-            print(f"    {partition.device}")
-            print(f"    [{bar}] {percent}%  {used:.2f} GB / {total:.2f} GB\n")
+            print(f"  {partition.device[:6]:<6}   [{get_bar(usage.percent)}] {usage.percent}%  {used:.1f} GB / {total:.1f} GB")
         except PermissionError:
-            # some drives like card readers show up but can't be read
             pass
 
 def list_processes():
-    print("\n[*] Top 10 processes by memory usage...\n")
     procs = []
     for proc in psutil.process_iter(['pid', 'name', 'memory_percent', 'cpu_percent']):
         try:
             procs.append(proc.info)
         except psutil.NoSuchProcess:
-            # process closed while we were reading it
             pass
 
-    # sort by memory and grab top 10
-    procs = sorted(procs, key=lambda x: x['memory_percent'], reverse=True)[:10]
-
-    print(f"    {'PID':<8} {'Name':<30} {'Memory':>8} {'CPU':>8}")
-    print(f"    {'-'*56}")
+    procs = sorted(procs, key=lambda x: x['memory_percent'], reverse=True)[:5]
+    print(f"\n  {'PID':<8} {'Name':<28} {'Mem':>6} {'CPU':>6}")
+    print(f"  {'-'*52}")
     for p in procs:
-        print(f"    {p['pid']:<8} {p['name'][:28]:<30} {p['memory_percent']:>7.1f}% {p['cpu_percent']:>7.1f}%")
+        print(f"  {p['pid']:<8} {p['name'][:26]:<28} {p['memory_percent']:>5.1f}% {p['cpu_percent']:>5.1f}%")
 
-print("\n==============================")
-print("   SYSTEM HEALTH MONITOR     ")
-print("==============================")
+print("Press Ctrl+C to exit\n")
+time.sleep(1)
 
-monitor_cpu()
-monitor_memory()
-monitor_disk()
-list_processes()
-
-print("\n[+] Done.")
+try:
+    while True:
+        clear()
+        print("=" * 56)
+        print("          SYSTEM HEALTH MONITOR")
+        print("=" * 56)
+        monitor_cpu()
+        monitor_memory()
+        monitor_disk()
+        list_processes()
+        print(f"\n  Refreshing every 2 seconds. Ctrl+C to exit.")
+        print("=" * 56)
+        time.sleep(2)
+except KeyboardInterrupt:
+    print("\n\nMonitor stopped.\n")
